@@ -15,17 +15,19 @@ from utils.config import AppConfig
 from utils.drawing import draw_face, draw_mouth, draw_status
 from utils.fps import FPSCounter
 from utils.logger import configure_logging
+from visual_vad.speech_detector import SpeechDetectorConfig, VisualSpeechDetector
 
 LOGGER = logging.getLogger(__name__)
 
 
-async def run(config: AppConfig) -> None:
+async def run(config: AppConfig, speech_config: SpeechDetectorConfig | None = None) -> None:
     camera = Camera(config.camera)
     detector = FaceDetector(config.detection)
     tracker = FaceTracker(config.tracker)
     mesh = FaceMeshProcessor(config.mesh)
     roi_extractor = MouthROIExtractor(config.mouth_roi)
     feature_extractor = MouthFeatureExtractor()
+    speech_detector = VisualSpeechDetector(speech_config or SpeechDetectorConfig())
     fps_counter = FPSCounter()
     cv2.namedWindow("Visual VAD", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Mouth ROI (96x96)", cv2.WINDOW_AUTOSIZE)
@@ -49,6 +51,9 @@ async def run(config: AppConfig) -> None:
                             draw_mouth(display, mouth_points, mouth_box)
                             cv2.imshow("Mouth ROI (96x96)", features.roi)
                             status = "Mouth features extracted"
+                            event = speech_detector.update(features)
+                            if event is not None:
+                                LOGGER.info("%s confidence=%.2f", event.event_type, event.confidence)
                 else:
                     status = "Face mesh unavailable"
             draw_status(display, fps, status)
