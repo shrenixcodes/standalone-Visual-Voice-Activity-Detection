@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visual-vad"
+version = "0.1.0"
+description = "CPU-only visual voice activity detection from webcam video"
+requires-python = ">=3.11"
+dependencies = ["opencv-python>=4.9,<5", "mediapipe>=0.10.14,<0.11", "numpy>=1.26,<3", "PyYAML>=6.0,<7"]
+
+[tool.setuptools.packages.find]
+include = ["visual_vad*", "detector*", "models*", "utils*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

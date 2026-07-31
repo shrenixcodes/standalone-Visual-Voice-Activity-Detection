@@ -1,0 +1,18 @@
+queue_size: 3
+visualize: false
+pipeline:
+  camera:
+    backend: directshow
+    max_consecutive_empty_frames: 30
+speech:
+  motion_threshold: 0.018
+  velocity_threshold: 0.75
+  acceleration_threshold: 8.0
+  min_confidence: 0.42
+  filter:
+    strategy: exponential_moving_average
+    window_size: 5
+    ema_alpha: 0.35
+  state_machine:
+    start_frames: 3
+    end_frames: 5

@@ -1,50 +1,88 @@
-# Standalone Visual Voice Activity Detection (VvAD)
+# Visual Voice Activity Detection
 
-A CPU-only webcam prototype that stops strictly at **mouth feature extraction**. It has no speech classifier, talking/not-talking output, speech events, WebRTC, or deep-learning speech model.
+CPU-only, real-time visual speech activity detection from a webcam. It analyzes one tracked face's lip motion and emits `speech_start` and `speech_end` events; it does not use audio.
 
-## Pipeline
+## Features
 
-`webcam -> multi-face detector -> primary-face tracker -> face mesh -> mouth ROI -> MouthFeatures`
+- MediaPipe Tasks face detection and face landmarking, compatible with Python 3.13
+- Stable primary-face tracking and boundary-safe 96×96 mouth ROI extraction
+- Multi-signal speech scoring: mouth geometry, temporal motion, velocity, and acceleration
+- Configurable moving average, exponential moving average, or median filtering
+- Debounced event state machine with no duplicate transition events
+- Async bounded-queue pipeline and clean public API
 
-All faces are detected each frame. The tracker keeps one primary ID through short detection losses using overlap matching; when it is lost it reacquires the largest face. Face Mesh runs only on a padded crop of that primary face. The bundled `assets/` directory contains the official MediaPipe Tasks models required by MediaPipe 0.10.35+ (including Python 3.13).
+## Architecture
 
-## Setup
+```text
+Camera -> Face/Tracker -> Face Mesh -> Mouth Features -> Filter/Score -> State Machine -> SpeechEvent
+```
 
-Python 3.11+ and a webcam are required.
+See [architecture](docs/architecture.md) and [pipeline](docs/pipeline.md) for implementation detail.
+
+## Installation
+
+Python 3.11+ is required.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
+python -m unittest discover -s tests
+```
+
+The checked-in `assets/` directory provides the required official MediaPipe model files.
+
+On Windows the default camera backend is DirectShow. If your camera needs a different backend, set `pipeline.camera.backend` to `auto` or `mediafoundation` in configuration.
+
+## Quick start
+
+```python
+import asyncio
+from visual_vad import VisualVAD
+
+async def main() -> None:
+    async for event in VisualVAD().detect():
+        print(event.event_type, event.timestamp, event.confidence)
+
+asyncio.run(main())
+```
+
+The same integration is available in `python examples/events.py`.
+
+`demo.py` remains available as the visual feature-extraction diagnostic:
+
+```powershell
 python demo.py --camera 0
 ```
 
-Press `q` or `Esc` to exit. Select a different webcam with `--camera 1`. If CPU performance is constrained, try `--width 640 --height 480`.
+## Configuration
 
-## Output
+Copy [config.example.yaml](config.example.yaml), adjust its values, then call `load_config(path)` and pass the result to `VisualVAD`. Every speech threshold, filter setting, debounce setting, and pipeline setting is configurable. See [configuration](docs/configuration.md).
 
-`MouthFeatureExtractor` produces an immutable `MouthFeatures` object for every valid frame:
-
-- Monotonic capture `timestamp`
-- `mouth_width`, `mouth_height`, rectangle `mouth_area`, and `mouth_aspect_ratio` (height/width)
-- Lip `centroid` in source-frame pixels
-- 96 x 96 BGR `roi`
-
-## Visual output / example screenshots
-
-The **Visual VAD** window shows a green primary-face rectangle and stable face ID, orange lip landmarks, a blue padded mouth rectangle, rolling FPS, and tracking status. The **Mouth ROI (96x96)** window continuously shows the normalized mouth crop. When a face, mesh, or landmarks are unavailable, the main status reports the condition without crashing.
-
-## Configuration and layout
-
-Typed dataclasses in `utils/config.py` control camera properties, detector confidence, tracking IoU/loss duration, face-crop padding, mouth padding, and ROI size.
+## Project structure
 
 ```text
-detector/  webcam capture, detection, tracking, mesh, ROI, feature extraction
-models/    Face and MouthFeatures data contracts
-utils/     configuration, logging, FPS, visualization
-assets/    official MediaPipe face detector and landmarker model files
-demo.py    asynchronous interactive entry point
+visual_vad/  public API, async engine, filters, events, speech state/scoring
+detector/    existing capture, detection, tracking, mesh, ROI, feature modules
+models/      immutable frame-domain data contracts
+utils/       configuration, timing, drawing, logging
+assets/      MediaPipe Tasks models
+tests/       deterministic component tests
+docs/        architecture, pipeline, API, configuration, development notes
 ```
 
-Empty frames and disconnections are logged and end capture cleanly. Missing faces, landmarks, or ROI data are safely skipped.
+## Performance and limitations
+
+The system initializes MediaPipe once and uses bounded queues to limit latency. Achievable FPS depends on camera resolution and CPU; use 640×480 when required. VvAD is inherently sensitive to occlusion, profile poses, low light, and non-speech mouth movements. It is a visual signal, not a reliable speech-recognition system.
+
+## Future improvements
+
+Calibration per camera/user, adaptive thresholds, frame-level diagnostics, metrics hooks, and optional persistent event sinks are natural next steps.
+
+## Contributing
+
+Run tests before submitting changes, preserve typed module boundaries, and avoid adding speech-model dependencies without a separate design review.
+
+## License
+
+No license has been selected for this repository yet.

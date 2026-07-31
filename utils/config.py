@@ -9,6 +9,8 @@ class CameraConfig:
     width: int = 1280
     height: int = 720
     requested_fps: int = 30
+    backend: str = "directshow"
+    max_consecutive_empty_frames: int = 30
 
 @dataclass(slots=True)
 class DetectionConfig:
