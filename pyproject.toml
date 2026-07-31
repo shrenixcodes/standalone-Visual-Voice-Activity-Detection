@@ -9,6 +9,9 @@ description = "CPU-only visual voice activity detection from webcam video"
 requires-python = ">=3.11"
 dependencies = ["opencv-python>=4.9,<5", "mediapipe>=0.10.14,<0.11", "numpy>=1.26,<3", "PyYAML>=6.0,<7"]
 
+[project.scripts]
+visual-vad = "visual_vad.__main__:main"
+
 [tool.setuptools.packages.find]
 include = ["visual_vad*", "detector*", "models*", "utils*"]
 

@@ -49,6 +49,8 @@ asyncio.run(main())
 
 The same integration is available in `python examples/events.py`.
 
+For the complete packaged pipeline, use `python -m visual_vad --config config.example.yaml`.
+
 `demo.py` remains available as the visual feature-extraction diagnostic:
 
 ```powershell
