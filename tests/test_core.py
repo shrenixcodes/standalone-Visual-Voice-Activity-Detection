@@ -40,16 +40,23 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(median_filter.update(1), 3)
 
     def test_state_machine_debounces_events(self) -> None:
-        machine = SpeechStateMachine(StateMachineConfig(start_frames=2, end_frames=2))
-        self.assertIsNone(machine.update(True, 1, 1))
-        self.assertEqual(machine.update(True, 2, 1).event_type, SpeechEventType.SPEECH_START)
-        self.assertIsNone(machine.update(True, 3, 1))
-        self.assertIsNone(machine.update(False, 4, 0))
-        self.assertEqual(machine.update(False, 5, 0).event_type, SpeechEventType.SPEECH_END)
+        machine = SpeechStateMachine(StateMachineConfig(start_confidence=0.6, end_confidence=0.2, start_hold_seconds=0.2, end_hold_seconds=1.0, minimum_talking_seconds=0.5))
+        self.assertIsNone(machine.update(0.8, 1.0))
+        self.assertEqual(machine.update(0.8, 1.25).event_type, SpeechEventType.SPEECH_START)
+        self.assertIsNone(machine.update(0.1, 1.8))
+        self.assertIsNone(machine.update(0.1, 2.7))
+        self.assertEqual(machine.update(0.1, 2.85).event_type, SpeechEventType.SPEECH_END)
+
+    def test_state_machine_ignores_brief_confidence_drops_while_talking(self) -> None:
+        machine = SpeechStateMachine(StateMachineConfig(start_confidence=0.6, end_confidence=0.2, start_hold_seconds=0, end_hold_seconds=1.5, minimum_talking_seconds=0))
+        self.assertEqual(machine.update(0.8, 0.0).event_type, SpeechEventType.SPEECH_START)
+        for timestamp, confidence in ((0.2, 0.1), (0.7, 0.1), (1.0, 0.7), (1.2, 0.1)):
+            self.assertIsNone(machine.update(confidence, timestamp))
+        self.assertEqual(machine.state.value, "talking")
 
     def test_speech_detector_emits_transitions(self) -> None:
-        config = SpeechDetectorConfig(min_confidence=0.1, motion_threshold=0.001, velocity_threshold=0.01, acceleration_threshold=0.01)
-        config.state_machine = StateMachineConfig(start_frames=2, end_frames=2)
+        config = SpeechDetectorConfig(motion_threshold=0.001, velocity_threshold=0.01, acceleration_threshold=0.01)
+        config.state_machine = StateMachineConfig(start_confidence=0.1, end_confidence=0.01, start_hold_seconds=0, end_hold_seconds=0, minimum_talking_seconds=0)
         detector = VisualSpeechDetector(config)
         roi = np.zeros((96, 96, 3), dtype=np.uint8)
         extractor = MouthFeatureExtractor()

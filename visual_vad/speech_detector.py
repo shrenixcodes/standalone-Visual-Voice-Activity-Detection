@@ -16,7 +16,6 @@ class SpeechDetectorConfig:
     motion_threshold: float = 0.018
     velocity_threshold: float = 0.75
     acceleration_threshold: float = 8.0
-    min_confidence: float = 0.42
     motion_weight: float = 0.40
     velocity_weight: float = 0.35
     acceleration_weight: float = 0.25
@@ -34,7 +33,7 @@ class VisualSpeechDetector:
         signature = features.mouth_aspect_ratio + features.mouth_width / max(features.mouth_height + features.mouth_width, 1.0)
         if self._previous is None:
             self._previous = features.timestamp, signature, 0.0, 0.0
-            return self._machine.update(False, features.timestamp, 0.0)
+            return self._machine.update(0.0, features.timestamp)
         prior_time, prior_signature, prior_velocity, _ = self._previous
         elapsed = max(features.timestamp - prior_time, 1e-3)
         motion = abs(signature - prior_signature)
@@ -43,7 +42,7 @@ class VisualSpeechDetector:
         filtered_motion = self._filter.update(motion)
         confidence = self._confidence(filtered_motion, velocity, acceleration)
         self._previous = features.timestamp, signature, velocity, filtered_motion
-        return self._machine.update(confidence >= self._config.min_confidence, features.timestamp, confidence)
+        return self._machine.update(confidence, features.timestamp)
 
     def _confidence(self, motion: float, velocity: float, acceleration: float) -> float:
         config = self._config
