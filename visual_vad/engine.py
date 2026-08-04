@@ -10,6 +10,7 @@ from typing import AsyncIterator
 from detector.camera import Camera, VideoFrame
 from detector.face_detector import FaceDetector
 from detector.face_mesh import FaceMeshProcessor
+from detector.face_pose import estimate_yaw_degrees, has_usable_lips
 from detector.face_tracker import FaceTracker
 from detector.feature_extractor import MouthFeatureExtractor
 from detector.mouth_roi import MouthROIExtractor
@@ -65,9 +66,7 @@ class VisualVAD:
             while (item := await feature_frames.get()) is not _STOP:
                 packet = item
                 assert isinstance(packet, _FeatureFrame)
-                if packet.features is None:
-                    continue
-                event = speech.update(packet.features)
+                event = speech.update(packet.features) if packet.features is not None else speech.update_missing(packet.timestamp)
                 if event is not None:
                     await events.put(event)
             await events.put(_STOP)
@@ -87,14 +86,18 @@ class VisualVAD:
             detector.close()
             mesh.close()
 
-    @staticmethod
-    def _extract(frame: VideoFrame, detector: FaceDetector, tracker: FaceTracker, mesh: FaceMeshProcessor, roi: MouthROIExtractor, extractor: MouthFeatureExtractor) -> MouthFeatures | None:
+    def _extract(self, frame: VideoFrame, detector: FaceDetector, tracker: FaceTracker, mesh: FaceMeshProcessor, roi: MouthROIExtractor, extractor: MouthFeatureExtractor) -> MouthFeatures | None:
         face = tracker.update(detector.detect(frame.image), frame.image.shape)
         if face is None or not tracker.is_tracking:
             return None
         mesh_result = mesh.process(frame.image, face, frame.timestamp)
         if mesh_result is None:
             return None
-        _, lips = mesh_result
+        points, lips = mesh_result
+        yaw = estimate_yaw_degrees(points)
+        if yaw is None or abs(yaw) > self._config.pipeline.face_quality.max_yaw_degrees:
+            return None
+        if not has_usable_lips(lips, frame.image.shape, self._config.pipeline.face_quality):
+            return None
         roi_result = roi.extract(frame.image, lips)
         return None if roi_result is None else extractor.extract(frame.timestamp, lips, roi_result[1])

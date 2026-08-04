@@ -21,6 +21,9 @@ class DetectionConfig:
 class TrackerConfig:
     min_iou: float = 0.15
     max_missed_frames: int = 8
+    prediction_weight: float = 0.70
+    center_distance_weight: float = 0.20
+    reacquire_near_previous: bool = True
 
 @dataclass(slots=True)
 class MeshConfig:
@@ -34,6 +37,13 @@ class MouthRoiConfig:
     padding_x: int = 12
     padding_y: int = 10
     output_size: tuple[int, int] = (96, 96)
+    min_width: int = 12
+    min_height: int = 6
+
+@dataclass(slots=True)
+class FaceQualityConfig:
+    max_yaw_degrees: float = 35.0
+    min_lip_landmarks: int = 16
 
 @dataclass(slots=True)
 class AppConfig:
@@ -42,3 +52,4 @@ class AppConfig:
     tracker: TrackerConfig = field(default_factory=TrackerConfig)
     mesh: MeshConfig = field(default_factory=MeshConfig)
     mouth_roi: MouthRoiConfig = field(default_factory=MouthRoiConfig)
+    face_quality: FaceQualityConfig = field(default_factory=FaceQualityConfig)

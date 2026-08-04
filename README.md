@@ -96,6 +96,8 @@ The system starts only after the score stays above `start_confidence` for `start
 
 If it ends too early, increase `end_hold_seconds`. If it does not start, lower `start_confidence` in small steps. Keep `end_confidence` below `start_confidence`.
 
+The pipeline also holds the existing speech state briefly when face landmarks are unavailable, the mouth ROI is invalid, or the face is turned beyond the configured yaw limit. Relevant controls are `speech.occlusion_grace_seconds`, `pipeline.tracker.max_missed_frames`, and `pipeline.face_quality.max_yaw_degrees`.
+
 On Windows, the default camera backend is DirectShow. If the camera fails to start, use `auto` or `mediafoundation` under `pipeline.camera.backend`.
 
 ## Layout

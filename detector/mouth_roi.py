@@ -19,7 +19,7 @@ class MouthROIExtractor:
         x1, x2 = max(0, min(xs) - self._config.padding_x), min(width, max(xs) + self._config.padding_x)
         y1, y2 = max(0, min(ys) - self._config.padding_y), min(height, max(ys) + self._config.padding_y)
         box = BoundingBox(x1, y1, x2 - x1, y2 - y1)
-        if not box.area:
+        if box.width < self._config.min_width or box.height < self._config.min_height:
             return None
         roi = frame[y1:y2, x1:x2]
         if roi.size == 0:

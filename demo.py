@@ -8,6 +8,7 @@ import cv2
 from detector.camera import Camera
 from detector.face_detector import FaceDetector
 from detector.face_mesh import FaceMeshProcessor
+from detector.face_pose import estimate_yaw_degrees, has_usable_lips
 from detector.face_tracker import FaceTracker
 from detector.feature_extractor import MouthFeatureExtractor
 from detector.mouth_roi import MouthROIExtractor
@@ -37,26 +38,40 @@ async def run(config: AppConfig, speech_config: SpeechDetectorConfig | None = No
             frame, display = video_frame.image, video_frame.image.copy()
             face = tracker.update(detector.detect(frame), frame.shape)
             fps, status = fps_counter.update(), "No face"
-            if face is not None:
+            features = None
+            if face is not None and tracker.is_tracking:
                 draw_face(display, face)
-                status = "Tracking" if tracker.is_tracking else "Temporarily lost"
                 result = mesh.process(frame, face, video_frame.timestamp)
                 if result is not None:
-                    _, mouth_points = result
-                    roi_result = roi_extractor.extract(frame, mouth_points)
-                    if roi_result is not None:
-                        mouth_box, roi = roi_result
-                        features = feature_extractor.extract(video_frame.timestamp, mouth_points, roi)
-                        if features is not None:
-                            draw_mouth(display, mouth_points, mouth_box)
-                            cv2.imshow("Mouth ROI (96x96)", features.roi)
-                            event = speech_detector.update(features)
-                            activity = "Talking" if speech_detector.is_talking else "Silent"
-                            status = f"{activity} | score {speech_detector.last_confidence:.2f}"
-                            if event is not None:
-                                LOGGER.info("%s confidence=%.2f", event.event_type, event.confidence)
+                    points, mouth_points = result
+                    yaw = estimate_yaw_degrees(points)
+                    if yaw is None or abs(yaw) > config.face_quality.max_yaw_degrees:
+                        status = "Profile view"
+                    elif not has_usable_lips(mouth_points, frame.shape, config.face_quality):
+                        status = "Mouth occluded"
+                    else:
+                        roi_result = roi_extractor.extract(frame, mouth_points)
+                        if roi_result is not None:
+                            mouth_box, roi = roi_result
+                            features = feature_extractor.extract(video_frame.timestamp, mouth_points, roi)
+                            if features is not None:
+                                draw_mouth(display, mouth_points, mouth_box)
+                                cv2.imshow("Mouth ROI (96x96)", features.roi)
+                        else:
+                            status = "Invalid mouth ROI"
                 else:
                     status = "Face mesh unavailable"
+            elif face is not None:
+                draw_face(display, face)
+                status = "Face temporarily lost"
+            event = speech_detector.update(features) if features is not None else speech_detector.update_missing(video_frame.timestamp)
+            if features is not None:
+                activity = "Talking" if speech_detector.is_talking else "Silent"
+                status = f"{activity} | score {speech_detector.last_confidence:.2f}"
+            elif speech_detector.is_talking:
+                status = f"{status} | holding speech state"
+            if event is not None:
+                LOGGER.info("%s confidence=%.2f", event.event_type, event.confidence)
             draw_status(display, fps, status)
             cv2.imshow("Visual VAD", display)
             if cv2.waitKey(1) & 0xFF in (27, ord("q")):

@@ -4,10 +4,19 @@ pipeline:
   camera:
     backend: directshow
     max_consecutive_empty_frames: 30
+  tracker:
+    max_missed_frames: 8
+    prediction_weight: 0.70
+    center_distance_weight: 0.20
+    reacquire_near_previous: true
+  face_quality:
+    max_yaw_degrees: 35.0
+    min_lip_landmarks: 16
 speech:
   motion_threshold: 0.018
   velocity_threshold: 0.75
   acceleration_threshold: 8.0
+  occlusion_grace_seconds: 0.75
   filter:
     strategy: exponential_moving_average
     window_size: 5

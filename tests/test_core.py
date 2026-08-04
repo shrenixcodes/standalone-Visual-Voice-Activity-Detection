@@ -4,10 +4,11 @@ import unittest
 import numpy as np
 
 from detector.face_tracker import FaceTracker
+from detector.face_pose import estimate_yaw_degrees, has_usable_lips
 from detector.feature_extractor import MouthFeatureExtractor
 from detector.mouth_roi import MouthROIExtractor
 from models.face import BoundingBox, Face
-from utils.config import MouthRoiConfig, TrackerConfig
+from utils.config import FaceQualityConfig, MouthRoiConfig, TrackerConfig
 from visual_vad.events import SpeechEventType
 from visual_vad.filters import FilterConfig, FilterStrategy, TemporalFilter
 from visual_vad.speech_detector import SpeechDetectorConfig, VisualSpeechDetector
@@ -24,6 +25,22 @@ class CoreTests(unittest.TestCase):
         tracker.update([], (100, 100, 3))
         third = tracker.update([Face(0, BoundingBox(1, 1, 20, 20), 1.0)], (100, 100, 3))
         self.assertEqual(third.id, 2)
+
+    def test_tracker_predicts_short_face_loss(self) -> None:
+        tracker = FaceTracker(TrackerConfig(max_missed_frames=1))
+        tracker.update([Face(0, BoundingBox(0, 0, 20, 20), 1.0)], (100, 100, 3))
+        tracker.update([Face(0, BoundingBox(10, 0, 20, 20), 1.0)], (100, 100, 3))
+        predicted = tracker.update([], (100, 100, 3))
+        self.assertEqual(predicted.bbox.x, 20)
+
+    def test_pose_and_landmark_quality_checks(self) -> None:
+        points = [(0, 0)] * 455
+        points[234], points[1], points[454] = (10, 20), (50, 20), (90, 20)
+        self.assertEqual(estimate_yaw_degrees(points), 0.0)
+        points[1] = (80, 20)
+        self.assertGreater(abs(estimate_yaw_degrees(points)), 30)
+        self.assertTrue(has_usable_lips([(10, 10)] * 16, (100, 100, 3), FaceQualityConfig()))
+        self.assertFalse(has_usable_lips([(120, 10)] * 16, (100, 100, 3), FaceQualityConfig()))
 
     def test_roi_and_features(self) -> None:
         points = [(40, 45), (60, 45), (60, 55), (40, 55)]

@@ -19,6 +19,7 @@ class SpeechDetectorConfig:
     motion_weight: float = 0.40
     velocity_weight: float = 0.35
     acceleration_weight: float = 0.25
+    occlusion_grace_seconds: float = 0.75
 
 
 class VisualSpeechDetector:
@@ -29,6 +30,7 @@ class VisualSpeechDetector:
         self._machine = SpeechStateMachine(config.state_machine)
         self._previous: tuple[float, float, float, float] | None = None
         self._last_confidence = 0.0
+        self._missing_since: float | None = None
 
     @property
     def last_confidence(self) -> float:
@@ -39,6 +41,7 @@ class VisualSpeechDetector:
         return self._machine.state is SpeechState.TALKING
 
     def update(self, features: MouthFeatures) -> SpeechEvent | None:
+        self._missing_since = None
         signature = features.mouth_aspect_ratio + features.mouth_width / max(features.mouth_height + features.mouth_width, 1.0)
         if self._previous is None:
             self._previous = features.timestamp, signature, 0.0, 0.0
@@ -54,6 +57,14 @@ class VisualSpeechDetector:
         self._last_confidence = confidence
         self._previous = features.timestamp, signature, velocity, filtered_motion
         return self._machine.update(confidence, features.timestamp)
+
+    def update_missing(self, timestamp: float) -> SpeechEvent | None:
+        """Hold speech state through a short occlusion or profile-quality gap."""
+        self._missing_since = self._missing_since or timestamp
+        if timestamp - self._missing_since < self._config.occlusion_grace_seconds:
+            return None
+        self._last_confidence = 0.0
+        return self._machine.update(0.0, timestamp)
 
     def _confidence(self, motion: float, velocity: float, acceleration: float) -> float:
         config = self._config
