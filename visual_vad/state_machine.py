@@ -14,9 +14,9 @@ class SpeechState(StrEnum):
 
 @dataclass(slots=True)
 class StateMachineConfig:
-    start_confidence: float = 0.70
-    end_confidence: float = 0.15
-    start_hold_seconds: float = 0.40
+    start_confidence: float = 0.45
+    end_confidence: float = 0.24
+    start_hold_seconds: float = 0.25
     end_hold_seconds: float = 2.00
     minimum_talking_seconds: float = 1.00
 

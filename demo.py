@@ -50,8 +50,9 @@ async def run(config: AppConfig, speech_config: SpeechDetectorConfig | None = No
                         if features is not None:
                             draw_mouth(display, mouth_points, mouth_box)
                             cv2.imshow("Mouth ROI (96x96)", features.roi)
-                            status = "Mouth features extracted"
                             event = speech_detector.update(features)
+                            activity = "Talking" if speech_detector.is_talking else "Silent"
+                            status = f"{activity} | score {speech_detector.last_confidence:.2f}"
                             if event is not None:
                                 LOGGER.info("%s confidence=%.2f", event.event_type, event.confidence)
                 else:

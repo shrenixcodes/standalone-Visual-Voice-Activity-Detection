@@ -16,8 +16,8 @@ class FilterStrategy(StrEnum):
 @dataclass(slots=True)
 class FilterConfig:
     strategy: FilterStrategy = FilterStrategy.EXPONENTIAL_MOVING_AVERAGE
-    window_size: int = 7
-    ema_alpha: float = 0.25
+    window_size: int = 5
+    ema_alpha: float = 0.30
 
 
 class TemporalFilter:

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from models.mouth_features import MouthFeatures
 from visual_vad.filters import FilterConfig, TemporalFilter
-from visual_vad.state_machine import SpeechStateMachine, StateMachineConfig
+from visual_vad.state_machine import SpeechState, SpeechStateMachine, StateMachineConfig
 from visual_vad.events import SpeechEvent
 
 
@@ -28,11 +28,21 @@ class VisualSpeechDetector:
         self._filter = TemporalFilter(config.filter)
         self._machine = SpeechStateMachine(config.state_machine)
         self._previous: tuple[float, float, float, float] | None = None
+        self._last_confidence = 0.0
+
+    @property
+    def last_confidence(self) -> float:
+        return self._last_confidence
+
+    @property
+    def is_talking(self) -> bool:
+        return self._machine.state is SpeechState.TALKING
 
     def update(self, features: MouthFeatures) -> SpeechEvent | None:
         signature = features.mouth_aspect_ratio + features.mouth_width / max(features.mouth_height + features.mouth_width, 1.0)
         if self._previous is None:
             self._previous = features.timestamp, signature, 0.0, 0.0
+            self._last_confidence = 0.0
             return self._machine.update(0.0, features.timestamp)
         prior_time, prior_signature, prior_velocity, _ = self._previous
         elapsed = max(features.timestamp - prior_time, 1e-3)
@@ -41,6 +51,7 @@ class VisualSpeechDetector:
         acceleration = abs(velocity - prior_velocity) / elapsed
         filtered_motion = self._filter.update(motion)
         confidence = self._confidence(filtered_motion, velocity, acceleration)
+        self._last_confidence = confidence
         self._previous = features.timestamp, signature, velocity, filtered_motion
         return self._machine.update(confidence, features.timestamp)
 
